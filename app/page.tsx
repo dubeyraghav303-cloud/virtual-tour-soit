@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import Script from "next/script";
 
 export default function VirtualTour() {
-  const viewerRef = useRef(null);
-  const containerRef = useRef(null);
+  const viewerRef = useRef<PannellumViewer | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // We need to wait for the external Pannellum script to load on the window
@@ -144,12 +144,14 @@ export default function VirtualTour() {
         });
 
         // The Custom Event Listener to find coordinates safely
-        containerRef.current.addEventListener('mousedown', function(e) {
+        if (containerRef.current) {
+          containerRef.current.addEventListener('mousedown', (e: MouseEvent) => {
             if (viewerRef.current) {
-                let coords = viewerRef.current.mouseEventToCoords(e);
-                console.log("Pitch: " + coords[0].toFixed(2) + ", Yaw: " + coords[1].toFixed(2));
+              const coords = viewerRef.current.mouseEventToCoords(e);
+              console.log("Pitch: " + coords[0].toFixed(2) + ", Yaw: " + coords[1].toFixed(2));
             }
-        });
+          });
+        }
       }
     };
 
