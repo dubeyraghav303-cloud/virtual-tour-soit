@@ -1,16 +1,28 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 
 export default function VirtualTour() {
   const viewerRef = useRef<PannellumViewer | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Function to calculate HFOV to fit height
+  const calculateHfov = () => {
+    if (typeof window === "undefined") return 75;
+    const vaov = 60; // The vertical angle of view from your config
+    const aspect = window.innerWidth / window.innerHeight;
+    // hfov = 2 * atan(tan(vfov/2) * aspect)
+    const hfov = 2 * Math.atan(Math.tan((vaov / 2) * (Math.PI / 180)) * aspect) * (180 / Math.PI);
+    return Math.max(10, Math.min(hfov, 120)); // Cap between 10 and 120
+  };
+
   useEffect(() => {
     // We need to wait for the external Pannellum script to load on the window
     const initViewer = () => {
       if (window.pannellum && containerRef.current && !viewerRef.current) {
+        const initialHfov = calculateHfov();
+        
         viewerRef.current = window.pannellum.viewer(containerRef.current, {
           "default": {
             "firstScene": "soit_main",
@@ -21,6 +33,10 @@ export default function VirtualTour() {
             "haov": 360,
             "vaov": 60,
             "vOffset": 0,
+            "minHfov": 10,
+            "hfov": initialHfov,
+            "autoRotate": 2,
+            "autoRotateInactivityDelay": 3000,
             // Assuming your images are in the 'public/panoramas' folder
             "basePath": "/panoramas/" 
           },
@@ -143,6 +159,14 @@ export default function VirtualTour() {
           }
         });
 
+        // Resize Listener
+        const handleResize = () => {
+          if (viewerRef.current) {
+            viewerRef.current.setHfov(calculateHfov());
+          }
+        };
+        window.addEventListener('resize', handleResize);
+
         // The Custom Event Listener to find coordinates safely
         if (containerRef.current) {
           containerRef.current.addEventListener('mousedown', (e: MouseEvent) => {
@@ -152,14 +176,20 @@ export default function VirtualTour() {
             }
           });
         }
+
+        // Cleanup function for listeners
+        return () => {
+          window.removeEventListener('resize', handleResize);
+        };
       }
     };
 
     // Polling interval to check when Pannellum has finished loading from the CDN
     const checkPannellum = setInterval(() => {
       if (typeof window !== "undefined" && window.pannellum) {
-        initViewer();
+        const cleanup = initViewer();
         clearInterval(checkPannellum);
+        return cleanup;
       }
     }, 100);
 
@@ -174,19 +204,17 @@ export default function VirtualTour() {
 
   return (
     <>
-      {/* We use Next.js standard way to inject external CSS safely */}
       <link 
         rel="stylesheet" 
         href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"
       />
       
-      {/* Load the script before React makes the page interactive */}
       <Script 
         src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js" 
         strategy="beforeInteractive"
       />
 
-      <main className="w-full h-screen m-0 p-0 overflow-hidden">
+      <main className="w-full h-screen m-0 p-0 overflow-hidden bg-black flex items-center justify-center">
         {/* The div where Pannellum will mount */}
         <div ref={containerRef} className="w-full h-full" />
       </main>
